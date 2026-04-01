@@ -117,7 +117,10 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional package limit for faster generation during testing.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.limit is not None and args.limit < 1:
+        parser.error("--limit must be a positive integer.")
+    return args
 
 
 def main() -> int:
@@ -128,7 +131,11 @@ def main() -> int:
     args = parse_args()
 
     output_path = Path(args.output)
-    inventory = collect_inventory(limit=args.limit)
+    try:
+        inventory = collect_inventory(limit=args.limit)
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
 
     if args.format == "json":
         write_json(inventory, output_path)
