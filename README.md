@@ -4,7 +4,7 @@ This project provides a small Kali Linux application that creates a list of inst
 
 ## Requirements
 
-- Kali Linux (or any Debian-based distro with `dpkg-query` and `apt-cache`)
+- Kali Linux (or any Debian-based distro with `dpkg-query`)
 - Python 3.10+
 
 ## Usage
@@ -33,4 +33,4 @@ Each record contains:
 
 - `name`: Package/tool name
 - `version`: Installed package version
-- `description`: Package short description from APT metadata
+- `description`: Installed package short description from `dpkg-query`

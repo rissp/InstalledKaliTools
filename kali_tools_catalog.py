@@ -6,11 +6,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass
@@ -50,31 +50,23 @@ def list_installed_packages() -> list[tuple[str, str]]:
     return packages
 
 
-def descriptions_for_packages(packages: Iterable[str]) -> dict[str, str]:
-    """Fetch package descriptions in bulk using apt-cache show."""
-    package_list = list(packages)
-    if not package_list:
-        return {}
+def summary_for_installed_packages() -> dict[str, str]:
+    """
+    Return package short descriptions for installed packages.
 
-    raw = run_command(["apt-cache", "show", *package_list])
-    descriptions: dict[str, str] = {}
-
-    current_package: str | None = None
-    current_description: str | None = None
+    Uses dpkg-query directly, which is more reliable than passing very large
+    package lists to apt-cache.
+    """
+    raw = run_command(["dpkg-query", "-W", "-f=${Package}\t${binary:Summary}\n"])
+    summaries: dict[str, str] = {}
 
     for line in raw.splitlines():
-        if line.startswith("Package: "):
-            current_package = line.removeprefix("Package: ").strip()
-            current_description = None
-        elif line.startswith("Description: ") and current_package:
-            current_description = line.removeprefix("Description: ").strip()
-            if current_package not in descriptions:
-                descriptions[current_package] = current_description
-        elif line == "":
-            current_package = None
-            current_description = None
+        if not line.strip():
+            continue
+        name, summary = (line.split("\t", 1) + [""])[:2]
+        summaries[name.strip()] = summary.strip() or "Description not available"
 
-    return descriptions
+    return summaries
 
 
 def collect_inventory(limit: int | None = None) -> list[PackageInfo]:
@@ -82,7 +74,7 @@ def collect_inventory(limit: int | None = None) -> list[PackageInfo]:
     if limit is not None:
         package_rows = package_rows[:limit]
 
-    descriptions = descriptions_for_packages(name for name, _ in package_rows)
+    descriptions = summary_for_installed_packages()
 
     return [
         PackageInfo(name=name, version=version, description=descriptions.get(name, "Description not available"))
@@ -129,6 +121,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    if shutil.which("dpkg-query") is None:
+        print("Error: dpkg-query is required but is not available on this system.", file=sys.stderr)
+        return 1
+
     args = parse_args()
 
     output_path = Path(args.output)
